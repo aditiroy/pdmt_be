@@ -1,0 +1,98 @@
+version: "2"
+steps:
+  - name: java-build-app
+    template: loci-jdk-17-mvn-with-scan
+    parameters:
+      - name: buildCMD
+        value: "mvn clean package"
+      - name: SONAR_PROJECTNAME
+        value: "{{parameters.stash-project-name}}/{{parameters.repo-name}}"
+      - name: SONAR_PROJECTKEY
+        value: "{{parameters.stash-project-name}}-{{parameters.repo-name}}"
+      - name: SONAR_PARAMS
+        value: "--debug -Dproject.settings=sonar-project.properties -Dsonar.branch.name={{parameters.revision}}"
+  - name: build-package-n-publish-dev
+    template: publish-artifact
+    parameters:
+      - name: imagePath
+        value: e-dpiac-docker-local.docker.lowes.com
+      - name: imageName
+        value: "{{parameters.repo-name}}"
+      - name: tagName
+        value: "{{parameters.repo-name}}-{{parameters.tag}}"
+      - name: repo-name
+        value: "{{parameters.repo-name}}"
+      - name: stash-project-name
+        value: "{{parameters.stash-project-name}}"
+    when:
+      tag:
+        - release-dev-*
+  - name: build-package-n-publish-stage
+    template: publish-artifact
+    parameters:
+      - name: imagePath
+        value: e-dpiac-docker-local.docker.lowes.com
+      - name: imageName
+        value: "{{parameters.repo-name}}"
+      - name: tagName
+        value: "{{parameters.repo-name}}-{{parameters.tag}}"
+      - name: repo-name
+        value: "{{parameters.repo-name}}"
+      - name: stash-project-name
+        value: "{{parameters.stash-project-name}}"
+    when:
+      tag:
+        - release-stage-*
+  - name: build-package-n-publish-prod
+    template: publish-artifact
+    parameters:
+      - name: imagePath
+        value: e-dpiac-docker-local.docker.lowes.com
+      - name: imageName
+        value: "{{parameters.repo-name}}"
+      - name: tagName
+        value: "{{parameters.repo-name}}-{{parameters.tag}}"
+      - name: repo-name
+        value: "{{parameters.repo-name}}"
+      - name: stash-project-name
+        value: "{{parameters.stash-project-name}}"
+    when:
+      tag:
+        - release-prod-*
+  - name: deploy-to-carbon-dev
+    template: thor-webhook
+    parameters:
+      - name: appName
+        value: "{{parameters.repo-name}}"
+      - name: namespaceName
+        value: permit-data-management-ns
+      - name: imageTag
+        value: "{{parameters.repo-name}}-{{parameters.tag}}"
+    when:
+      tag:
+        - release-dev-*
+  - name: deploy-to-carbon-stage
+    template: thor-webhook
+    parameters:
+      - name: appName
+        value: "{{parameters.repo-name}}"
+      - name: namespaceName
+        value: permit-data-management-ns
+      - name: imageTag
+        value: "{{parameters.repo-name}}-{{parameters.tag}}"
+    when:
+      tag:
+        - release-stage-*
+notify:
+  success:
+    notificationType: "email"
+    toList: "dl-go-team-sleuths@lowes.com"
+    body: "LOCI Build Notification {{parameters.revision}} #{{parameters.build-number}}  - Success"
+    subject: "Build Success : {{parameters.repo-name}} - {{parameters.build-number}}"
+
+  failure:
+    notificationType: "email"
+    toList: "dl-go-team-sleuths@lowes.com"
+    body: "LOCI Build Notification {{parameters.revision}} #{{parameters.build-number}}  - Failure"
+    subject: "Build Failed : {{parameters.repo-name}} - {{parameters.build-number}}"
+
